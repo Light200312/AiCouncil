@@ -21,7 +21,7 @@ app.use(helmet());
 // CORS
 app.use(
   cors({
-    origin: env.CLIENT_URL,
+    origin: env.CLIENT_URLS,
     credentials: true,//allows the browser to send and receive cookies
   })
 );

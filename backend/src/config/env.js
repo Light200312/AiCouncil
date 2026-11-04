@@ -14,7 +14,10 @@ const envSchema = z.object({
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRES_IN: z.string().default("1d"),
 
-  CLIENT_URL: z.string().url(),
+ CLIENT_URLS: z
+  .string()
+  .transform((value) => JSON.parse(value))
+  .pipe(z.array(z.string().url())),
 });
 
 const result = envSchema.safeParse(process.env);

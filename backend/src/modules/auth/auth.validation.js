@@ -1,3 +1,4 @@
+//auth.validation.js
 import { z } from "zod";
 //  Why validate with Zod when Mongoose already validates?
 // They solve different problems.

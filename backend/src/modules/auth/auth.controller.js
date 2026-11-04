@@ -1,4 +1,4 @@
-
+//auth.controller.js
 import {
   registerUser,
   loginUser,

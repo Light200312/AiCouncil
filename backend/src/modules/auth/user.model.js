@@ -1,3 +1,4 @@
+//user.model.js
 import mongoose from "mongoose";
 
 const userSchema = new mongoose.Schema(
@@ -34,7 +35,7 @@ const userSchema = new mongoose.Schema(
       theme: {
         type: String,
         enum: ["light", "dark", "system"],
-        default: "system",
+        default: "dark",
       },
     },
 
