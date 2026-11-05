@@ -3,9 +3,12 @@ import express from "express";
 import cors from "cors";
 import helmet from "helmet";
 import cookieParser from "cookie-parser";
-
+import domainRoutes from './modules/domains/domain.routes.js'
+import debateRoutes from './modules/debates/debate.routes.js'
 import { env } from "./config/env.js";
+import expertRoutes from './modules/experts/expert.routes.js'
 import authRoutes from "./modules/auth/auth.routes.js";
+import aiRoutes from "./modules/ai/ai.routes.js";
 import {
   notFound,
   errorHandler,
@@ -37,7 +40,7 @@ app.get("/api/v1/health", (req, res) => {
     message: "AI Council API is running",
   });
 });
-
+app.use("/api/v1/ai", protect, aiRoutes);
 app.get("/api/v1/protected", protect, (req, res) => {
   res.status(200).json({
     success: true,
@@ -46,7 +49,9 @@ app.get("/api/v1/protected", protect, (req, res) => {
 });
 // Routes
 app.use("/api/v1/auth", authRoutes);
-
+app.use('/api/v1/domains', protect,domainRoutes)
+app.use('/api/v1/debates', protect,debateRoutes)
+app.use('/api/v1/experts', protect, expertRoutes)
 // Error handling (must be after routes)
 app.use(notFound);
 app.use(errorHandler);

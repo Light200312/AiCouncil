@@ -9,9 +9,13 @@
   "scripts": {
     "test": "echo \"Error: no test specified\" && exit 1",
     "dev": "nodemon src/server.js",
-    "start": "node src/server.js"
+    "start": "node src/server.js",
+    "seed:domains": "node src/scripts/seed-domains.js",
+    "seed:experts": "node src/scripts/seed-experts.js",
+    "test:llm": "node src/scripts/test-llm.js"
   },
   "dependencies": {
+    "axios": "^1.21.0",
     "bcryptjs": "^3.0.3",
     "cookie-parser": "^1.4.7",
     "cors": "^2.8.6",
