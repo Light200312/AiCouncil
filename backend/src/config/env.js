@@ -2,22 +2,23 @@ import dotenv from "dotenv";
 import { z } from "zod";
 
 dotenv.config();
-//Environment variables are external configuration. If MONGO_URI or JWT_SECRET is missing, we want the application to fail immediately with a clear error instead of failing later during a request.
+
 const envSchema = z.object({
   PORT: z.coerce.number().default(5000),
-  NODE_ENV: z
-    .enum(["development", "production", "test"])
-    .default("development"),
+  NODE_ENV: z.enum(["development", "production", "test"]).default("development"),
 
   MONGO_URI: z.string().min(1),
 
   JWT_SECRET: z.string().min(32),
   JWT_EXPIRES_IN: z.string().default("1d"),
 
- CLIENT_URLS: z
-  .string()
-  .transform((value) => JSON.parse(value))
-  .pipe(z.array(z.string().url())),
+  CLIENT_URLS: z
+    .string()
+    .transform((value) => JSON.parse(value))
+    .pipe(z.array(z.string().url())),
+
+  API_BOX_URL: z.string().url().default("http://localhost:8000/api/ask"),
+  API_BOX_PROVIDER: z.enum(["chatgpt", "claude", "gemini", "grok", "deepseek"]).default("gemini"),
 });
 
 const result = envSchema.safeParse(process.env);
