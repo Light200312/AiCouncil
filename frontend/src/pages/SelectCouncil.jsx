@@ -5,6 +5,7 @@ import { getExperts, createExpert } from "../services/expert";
 import ExpertForm from "../components/council/ExpertForm";
 import { getDomains } from "../services/domain";
 import { suggestExperts } from "../services/ai";
+import ExpertCard from "../components/council/ExpertCard";
 export default function SelectCouncil() {
   const location = useLocation();
   const navigate = useNavigate();
@@ -19,22 +20,22 @@ export default function SelectCouncil() {
   const domainIds = selectedDomains.map((domain) =>
     typeof domain === "string" ? domain : domain._id,
   );
-const suggestExpertsMutation = useMutation({
-  mutationFn: () => suggestExperts(topic, domainIds),
-  onSuccess: (result) => {
-    setSelectedExperts((current) =>
-      current.filter((expert) => !expert.isTemporary),
-    );
-    setAiRecommendations(result);
-  },
-});
-const getInitials = (name = "") =>
-  name
-    .split(" ")
-    .filter(Boolean)
-    .slice(0, 2)
-    .map((word) => word[0].toUpperCase())
-    .join("");
+  const suggestExpertsMutation = useMutation({
+    mutationFn: () => suggestExperts(topic, domainIds),
+    onSuccess: (result) => {
+      setSelectedExperts((current) =>
+        current.filter((expert) => !expert.isTemporary),
+      );
+      setAiRecommendations(result);
+    },
+  });
+  const getInitials = (name = "") =>
+    name
+      .split(" ")
+      .filter(Boolean)
+      .slice(0, 2)
+      .map((word) => word[0].toUpperCase())
+      .join("");
   const recommendedExpertsQuery = useQuery({
     queryKey: ["recommendedExperts"],
     queryFn: () => getExperts(),
@@ -106,7 +107,6 @@ const getInitials = (name = "") =>
   };
   const queryClient = useQueryClient();
   const [showExpertForm, setShowExpertForm] = useState(false);
-  
 
   const { data: availableDomains = [] } = useQuery({
     queryKey: ["domains"],
@@ -139,7 +139,7 @@ const getInitials = (name = "") =>
     );
   }
   return (
-  <div className="mx-auto max-w-7xl space-y-6 px-6 pt-6 pb-28">
+    <div className="mx-auto max-w-7xl space-y-6 px-6 pt-6 pb-28">
       <header>
         <button
           onClick={() => navigate("/configure")}
@@ -151,62 +151,72 @@ const getInitials = (name = "") =>
         <h1 className="text-2xl font-bold">Select Council Members</h1>
         <p className="mt-2 text-text-secondary">{topic}</p>
       </header>
-      {/* ai recommendation */}
-      <div className="rounded-xl border border-border bg-surface p-4">
-        <div className="flex flex-wrap items-center justify-between gap-4">
-          {/* <div>
-            <h2 className="font-semibold">AI Council Assembly</h2>
-            <p className="mt-1 text-sm text-text-secondary">
-              Let AI find suitable experts and identify missing perspectives.
-            </p>
-          </div> */}
 
-          <button
-            type="button"
-            onClick={() => suggestExpertsMutation.mutate()}
-            disabled={suggestExpertsMutation.isPending || isLoading}
-            className="rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
-          >
-            {suggestExpertsMutation.isPending
-              ? "Assembling Council..."
-              : "✨ Assemble Council with AI"}
-          </button>
-        </div>
+ <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
+  {/* Expert filters */}
+  <div className="flex flex-wrap gap-2">
+    {["all", "ai", "human"].map((item) => (
+      <button
+        key={item}
+        type="button"
+        onClick={() => setType(item)}
+        className={`rounded-lg border px-4 py-2 text-sm font-medium capitalize transition-colors ${
+          type === item
+            ? "border-brand bg-brand/10 text-text-primary"
+            : "border-border text-text-secondary hover:border-brand/50 hover:text-text-primary"
+        }`}
+      >
+        {item === "all"
+          ? "All Experts"
+          : item === "ai"
+            ? "AI Experts"
+            : "Human-like"}
+      </button>
+    ))}
+  </div>
 
-        {suggestExpertsMutation.isError && (
-          <p className="mt-3 text-sm text-red-400">
-            {suggestExpertsMutation.error?.response?.data?.message ||
-              "Unable to assemble the council. Please try again."}
-          </p>
-        )}
-      </div>
-      <div className=" flex justify-between gap-3 flex-wrap items-center">
-        <div className="flex flex-wrap gap-3">
-          {["all", "ai", "human"].map((item) => (
-            <button
-              key={item}
-              onClick={() => setType(item)}
-              className={`rounded-lg border px-4 py-2 capitalize ${
-                type === item
-                  ? "border-brand bg-brand/10 text-text-primary"
-                  : "border-border text-text-secondary"
-              }`}
-            >
-              {item === "all"
-                ? "All Experts"
-                : item === "ai"
-                  ? "AI Experts"
-                  : "Human-like"}
-            </button>
-          ))}
-        </div>
-        <button
-          onClick={() => setShowExpertForm(true)}
-          className="rounded-lg border border-brand px-4 py-2 text-sm text-brand hover:bg-brand/10"
-        >
-          + Create Expert
-        </button>
-      </div>
+  {/* Council actions */}
+  <div className="flex min-w-0 flex-col gap-2 sm:flex-row sm:items-start">
+    <button
+      type="button"
+      onClick={() => setShowExpertForm(true)}
+      className="rounded-lg border border-brand px-4 py-2.5 text-sm font-medium text-brand transition-colors hover:bg-brand/10"
+    >
+      + Create Expert
+    </button>
+
+    <button
+      type="button"
+      onClick={() => suggestExpertsMutation.mutate()}
+      disabled={suggestExpertsMutation.isPending || isLoading}
+      className="flex items-center justify-center gap-2 whitespace-nowrap rounded-lg bg-brand px-4 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-50"
+    >
+      {suggestExpertsMutation.isPending ? (
+        <>
+          <span className="h-4 w-4 animate-spin rounded-full border-2 border-white/30 border-t-white" />
+          Assembling...
+        </>
+      ) : (
+        "✨ Assemble Council with AI"
+      )}
+    </button>
+  </div>
+</div>
+
+{/* AI assembly error */}
+{suggestExpertsMutation.isError && (
+  <div
+    role="alert"
+    className="flex min-w-0 items-start gap-2 rounded-lg border border-red-500/30 bg-red-500/5 px-4 py-3 text-sm text-red-400"
+  >
+    <span className="shrink-0">⚠</span>
+    <p className="min-w-0 break-words">
+      {suggestExpertsMutation.error?.response?.data?.message ||
+        suggestExpertsMutation.error?.message ||
+        "Unable to assemble the council. Please try again."}
+    </p>
+  </div>
+)}
 
       <input
         value={search}
@@ -327,248 +337,146 @@ const getInitials = (name = "") =>
             </div>
           )}
 
-        {aiRecommendations?.newExperts?.length > 0 && (
-  <section className="space-y-3">
-    <div>
-      <h2 className="text-lg font-semibold">Proposed New Experts</h2>
-      <p className="text-sm text-text-secondary">
-        These experts fill gaps in the existing council. They are temporary
-        and won't be saved to your reusable experts.
-      </p>
-    </div>
-
-    <div className="grid gap-4 sm:grid-cols-2">
-      {aiRecommendations.newExperts.map((expert, index) => {
-        const temporaryId = `temporary-${index}`;
-        const selected = isSelected(temporaryId);
-
-        return (
-          <article
-            key={temporaryId}
-            className="rounded-xl border border-dashed border-brand/60 bg-surface p-4"
-          >
-            <div className="flex items-start justify-between gap-3">
+          {aiRecommendations?.newExperts?.length > 0 && (
+            <section className="space-y-3">
               <div>
-                <h3 className="font-semibold">{expert.name}</h3>
-                <p className="text-sm text-text-secondary">{expert.role}</p>
+                <h2 className="text-lg font-semibold">Proposed New Experts</h2>
+                <p className="text-sm text-text-secondary">
+                  These experts fill gaps in the existing council. They are
+                  temporary and won't be saved to your reusable experts.
+                </p>
               </div>
 
-              <span className="rounded-md bg-brand/10 px-2 py-1 text-xs text-brand">
-                AI Proposed
-              </span>
-            </div>
+              <div className="grid items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-3">
+                {aiRecommendations.newExperts.map((expert, index) => {
+                  const temporaryId = `temporary-${index}`;
+                  const selected = isSelected(temporaryId);
 
-            <p className="mt-3 text-sm text-text-secondary">
-              {expert.description}
-            </p>
+                  return (
+                    <ExpertCard
+                      key={`temporary-${index}`}
+                      expert={expert}
+                      domains={availableDomains}
+                      temporary
+                      selected={isSelected(`temporary-${index}`)}
+                      onToggle={() => {
+                        const id = `temporary-${index}`;
 
-            <p className="mt-3 text-sm">
-              <strong>Reason:</strong> {expert.reason}
-            </p>
-
-            {expert.isHumanLike && (
-              <div className="mt-3 space-y-1 text-sm text-text-secondary">
-                <p><strong>Inspired by:</strong> {expert.inspiredBy || "Original character"}</p>
-                <p><strong>Traits:</strong> {expert.characterTraits?.join(", ")}</p>
+                        if (isSelected(id)) {
+                          setSelectedExperts((current) =>
+                            current.filter((item) => item._id !== id),
+                          );
+                        } else {
+                          addProposedExpert(expert, index);
+                        }
+                      }}
+                    />
+                  );
+                })}
               </div>
-            )}
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              {expert.expertise.map((id) => {
-                const domain = availableDomains.find(
-                  (item) => item._id === id
-                );
-
-                return domain ? (
-                  <span
-                    key={id}
-                    className="rounded-full bg-surface-hover px-2 py-1 text-xs text-text-secondary"
-                  >
-                    {domain.name}
-                  </span>
-                ) : null;
-              })}
-            </div>
-
-            <button
-              type="button"
-            onClick={() => {
-  if (selected) {
-    setSelectedExperts((current) =>
-      current.filter((item) => item._id !== temporaryId),
-    );
-  } else {
-    addProposedExpert(expert, index);
-  }
-}}
-              disabled={!selected && selectedExperts.length >= 12}
-              className={`mt-4 w-full rounded-lg px-3 py-2 text-sm font-medium disabled:opacity-40 ${
-                selected
-                  ? "border border-brand text-brand"
-                  : "bg-brand text-white hover:bg-brand-hover"
-              }`}
-            >
-              {selected ? "Remove from Council" : "Add to Council"}
-            </button>
-          </article>
-        );
-      })}
-    </div>
-  </section>
-)}
+            </section>
+          )}
         </section>
       )}
-      <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
+      <div className="grid items-stretch gap-5 sm:grid-cols-2 lg:grid-cols-3">
         {experts.map((expert) => (
-          <article
+          <ExpertCard
             key={expert._id}
-            className="rounded-xl border border-border bg-surface p-4"
-          >
-            <div className="flex items-start justify-between gap-3">
-              <div>
-                <h3 className="font-semibold">{expert.name}</h3>
-                <p className="text-sm text-text-secondary">{expert.role}</p>
-              </div>
-
-              <span className="rounded-md bg-surface-hover px-2 py-1 text-xs">
-                {expert.isHumanLike ? "Human-like" : "AI"}{" "}
-                {isRecommended(expert._id) && (
-                  <span className="rounded-md bg-brand/10 px-2 py-1 text-xs text-brand">
-                    AI Recommended
-                  </span>
-                )}
-              </span>
-            </div>
-
-            <p className="mt-3 text-sm text-text-secondary">
-              {expert.description}
-            </p>
-
-            {expert.isHumanLike && (
-              <div className="mt-3 space-y-2 text-sm">
-                <p>
-                  <strong>Inspired by:</strong>{" "}
-                  {expert.inspiredBy || "Original character"}
-                </p>
-                <p>
-                  <strong>Traits:</strong> {expert.characterTraits?.join(", ")}
-                </p>
-              </div>
-            )}
-
-            <div className="mt-3 flex flex-wrap gap-2">
-              {expert.expertise.map((domain) => (
-                <span
-                  key={domain._id}
-                  className="rounded-full bg-surface-hover px-2 py-1 text-xs text-text-secondary"
-                >
-                  {domain.name}
-                </span>
-              ))}
-            </div>
-
-            <button
-              onClick={() => toggleExpert(expert)}
-              className={`mt-4 w-full rounded-lg px-3 py-2 text-sm font-medium ${
-                isSelected(expert._id)
-                  ? "border border-brand text-brand"
-                  : "bg-brand text-white hover:bg-brand-hover"
-              }`}
-            >
-              {isSelected(expert._id)
-                ? "Remove from Council"
-                : "Add to Council"}
-            </button>
-          </article>
+            expert={expert}
+            domains={availableDomains}
+            selected={isSelected(expert._id)}
+            recommended={isRecommended(expert._id)}
+            onToggle={() => toggleExpert(expert)}
+          />
         ))}
       </div>
 
-     <div className="fixed bottom-5 left-1/2 z-40 w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 rounded-2xl border border-border bg-surface/95 px-4 py-3 shadow-2xl backdrop-blur-lg">
-  <div className="flex items-center justify-between gap-4">
-    {/* Selected members */}
-    <div className="flex min-w-0 items-center gap-3">
+      <div className="fixed bottom-5 left-1/2 z-40 w-[calc(100%-2rem)] max-w-3xl -translate-x-1/2 rounded-2xl border border-border bg-surface/95 px-4 py-3 shadow-2xl backdrop-blur-lg">
+        <div className="flex items-center justify-between gap-4">
+          {/* Selected members */}
+          <div className="flex min-w-0 items-center gap-3">
+            {/* Overlapping member avatars */}
+            <div className="flex items-center pl-2">
+              {selectedExperts.map((expert, index) => {
+                const expertise = (expert.expertise || [])
+                  .map((domain) =>
+                    typeof domain === "string"
+                      ? availableDomains.find((item) => item._id === domain)
+                          ?.name
+                      : domain.name,
+                  )
+                  .filter(Boolean);
 
-      {/* Overlapping member avatars */}
-      <div className="flex items-center pl-2">
-        {selectedExperts.map((expert, index) => {
-          const expertise = (expert.expertise || [])
-            .map((domain) =>
-              typeof domain === "string"
-                ? availableDomains.find((item) => item._id === domain)?.name
-                : domain.name,
-            )
-            .filter(Boolean);
-
-          return (
-            <div
-              key={expert._id}
-              className="group relative -ml-2"
-              style={{ zIndex: selectedExperts.length - index }}
-            >
-              {/* Avatar */}
-              <div className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border-2 border-surface bg-surface-hover text-xs font-semibold text-text-primary transition-transform group-hover:scale-110">
-                {getInitials(expert.name)}
-              </div>
-
-              {/* Hover details */}
-              <div className="invisible absolute bottom-full left-1/2 z-50 mb-3 w-56 -translate-x-1/2 translate-y-1 opacity-0 transition-all duration-150 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
-                <div className="rounded-xl border border-border bg-surface p-3 shadow-xl">
-                  <div className="flex items-start justify-between gap-2">
-                    <div className="min-w-0">
-                      <p className="truncate text-sm font-semibold">
-                        {expert.name}
-                      </p>
-                      <p className="text-xs text-text-secondary">
-                        {expert.role}
-                      </p>
+                return (
+                  <div
+                    key={expert._id}
+                    className="group relative -ml-2"
+                    style={{ zIndex: selectedExperts.length - index }}
+                  >
+                    {/* Avatar */}
+                    <div className="flex h-9 w-9 cursor-pointer items-center justify-center rounded-full border-2 border-surface bg-surface-hover text-xs font-semibold text-text-primary transition-transform group-hover:scale-110">
+                      {getInitials(expert.name)}
                     </div>
 
-                    <button
-                      type="button"
-                      onClick={() => toggleExpert(expert)}
-                      title="Remove member"
-                      className="shrink-0 rounded-md px-1.5 text-text-secondary hover:bg-red-500/10 hover:text-red-400"
-                    >
-                      ✕
-                    </button>
-                  </div>
+                    {/* Hover details */}
+                    <div className="invisible absolute bottom-full left-1/2 z-50 mb-3 w-56 -translate-x-1/2 translate-y-1 opacity-0 transition-all duration-150 group-hover:visible group-hover:translate-y-0 group-hover:opacity-100">
+                      <div className="rounded-xl border border-border bg-surface p-3 shadow-xl">
+                        <div className="flex items-start justify-between gap-2">
+                          <div className="min-w-0">
+                            <p className="truncate text-sm font-semibold">
+                              {expert.name}
+                            </p>
+                            <p className="text-xs text-text-secondary">
+                              {expert.role}
+                            </p>
+                          </div>
 
-                  <div className="mt-2 flex flex-wrap gap-1">
-                    {expertise.map((name) => (
-                      <span
-                        key={name}
-                        className="rounded-full bg-surface-hover px-2 py-1 text-xs text-text-secondary"
-                      >
-                        {name}
-                      </span>
-                    ))}
+                          <button
+                            type="button"
+                            onClick={() => toggleExpert(expert)}
+                            title="Remove member"
+                            className="shrink-0 rounded-md px-1.5 text-text-secondary hover:bg-red-500/10 hover:text-red-400"
+                          >
+                            ✕
+                          </button>
+                        </div>
+
+                        <div className="mt-2 flex flex-wrap gap-1">
+                          {expertise.map((name) => (
+                            <span
+                              key={name}
+                              className="rounded-full bg-surface-hover px-2 py-1 text-xs text-text-secondary"
+                            >
+                              {name}
+                            </span>
+                          ))}
+                        </div>
+                      </div>
+                    </div>
                   </div>
-                </div>
-              </div>
+                );
+              })}
             </div>
-          );
-        })}
-      </div>
-      <div className="shrink-0">
-        <p className="text-sm font-semibold">
-          {selectedExperts.length}/12
-          <span className="ml-1 font-normal text-text-secondary">
-            selected
-          </span>
-        </p>
-      </div>
-    </div>
+            <div className="shrink-0">
+              <p className="text-sm font-semibold">
+                {selectedExperts.length}/12
+                <span className="ml-1 font-normal text-text-secondary">
+                  selected
+                </span>
+              </p>
+            </div>
+          </div>
 
-    {/* Navigation */}
-    <button
-      disabled={selectedExperts.length < 2}
-      onClick={handleContinue}
-      className="shrink-0 rounded-xl bg-brand px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-40"
-    >
-      Continue →
-    </button>
-  </div>
-</div>
+          {/* Navigation */}
+          <button
+            disabled={selectedExperts.length < 2}
+            onClick={handleContinue}
+            className="shrink-0 rounded-xl bg-brand px-5 py-2.5 text-sm font-medium text-white transition-colors hover:bg-brand-hover disabled:cursor-not-allowed disabled:opacity-40"
+          >
+            Continue →
+          </button>
+        </div>
+      </div>
     </div>
   );
 }
