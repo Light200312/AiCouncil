@@ -1,6 +1,7 @@
 import Domain from "../domains/domain.model.js";
 import Expert from "../experts/expert.model.js";
 import { generateResponse } from "../../services/llm.service.js";
+import { parseAIJson } from "../../utils/parseAIJson.js";
 import {
   suggestedDomainsResponseSchema,suggestedExpertsResponseSchema
 } from "./ai.schema.js";
@@ -57,7 +58,7 @@ Rules:
       .trim();
 
     const parsed = suggestedDomainsResponseSchema.parse(
-  JSON.parse(cleanedResponse)
+  parseAIJson(cleanedResponse)
 );
 
     const validDomainIds = new Set(
@@ -200,7 +201,7 @@ Rules:
       .trim();
 
     const parsed = suggestedExpertsResponseSchema.parse(
-      JSON.parse(cleanedResponse)
+      parseAIJson(cleanedResponse)
     );
 
     // Only accept existing expert IDs that were actually provided.
