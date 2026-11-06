@@ -6,6 +6,8 @@ import Dashboard from './pages/Dashboard'
 import ProtectedRoute from './components/layout/ProtectedRoute'
 import ConfigureDebate from './pages/ConfigureDebate'
 import SelectCouncil from './pages/SelectCouncil'
+import DebateSetup from './pages/DebateSetup'
+import DebateWorkspace from './pages/DebateWorkspace'
 function App() {
   return (
     <Routes>
@@ -16,6 +18,8 @@ function App() {
         <Route path="/dashboard" element={<Dashboard />} />
         <Route path="/configure" element={<ConfigureDebate />} />
         <Route path="/select-council" element={<SelectCouncil />} />
+        <Route path="/debate/new" element={<DebateSetup />} />
+        <Route path="/debate/:sessionId" element={<DebateWorkspace />} />
       </Route>
 
       <Route path="/" element={<Navigate to="/dashboard" replace />} />
