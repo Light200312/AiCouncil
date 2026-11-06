@@ -487,14 +487,6 @@ const getInitials = (name = "") =>
   <div className="flex items-center justify-between gap-4">
     {/* Selected members */}
     <div className="flex min-w-0 items-center gap-3">
-      <div className="shrink-0">
-        <p className="text-sm font-semibold">
-          {selectedExperts.length}/12
-          <span className="ml-1 font-normal text-text-secondary">
-            selected
-          </span>
-        </p>
-      </div>
 
       {/* Overlapping member avatars */}
       <div className="flex items-center pl-2">
@@ -556,6 +548,14 @@ const getInitials = (name = "") =>
             </div>
           );
         })}
+      </div>
+      <div className="shrink-0">
+        <p className="text-sm font-semibold">
+          {selectedExperts.length}/12
+          <span className="ml-1 font-normal text-text-secondary">
+            selected
+          </span>
+        </p>
       </div>
     </div>
 
