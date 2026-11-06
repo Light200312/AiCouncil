@@ -5,7 +5,13 @@ import { QueryClient, QueryClientProvider } from '@tanstack/react-query'
 import App from './App'
 import './index.css'
 
-document.documentElement.classList.add('dark')
+const systemTheme = window.matchMedia('(prefers-color-scheme: dark)')
+const applySystemTheme = ({ matches }) => {
+  document.documentElement.classList.toggle('dark', matches)
+}
+
+applySystemTheme(systemTheme)
+systemTheme.addEventListener('change', applySystemTheme)
 
 const queryClient = new QueryClient({
   defaultOptions: {
