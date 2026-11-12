@@ -1,48 +1,125 @@
-
-import { useLocation, useParams, useNavigate } from 'react-router-dom'
+import { useState } from 'react'
+import { useNavigate, useParams } from 'react-router-dom'
+import { useMutation, useQuery, useQueryClient } from '@tanstack/react-query'
+import { useCurrentUser } from '../hooks/useCurrentUser'
+import { logoutUser } from '../services/auth'
+import { generateNextTurn, getDebateSession } from '../services/debate'
+import DiscussionPanel from '../components/workspace/DiscussionPanel'
+import WhiteboardPanel from '../components/workspace/WhiteboardPanel'
+import WorkspaceHeader from '../components/workspace/WorkspaceHeader'
+import WorkspaceSidebar from '../components/workspace/WorkspaceSidebar'
 
 export default function DebateWorkspace() {
   const { sessionId } = useParams()
-  const { state } = useLocation()
   const navigate = useNavigate()
-  const session = state?.session
+  const queryClient = useQueryClient()
+  const { data: user } = useCurrentUser()
+  const sessionQuery = useQuery({
+    queryKey: ['debateSession', sessionId],
+    queryFn: () => getDebateSession(sessionId),
+    enabled: Boolean(sessionId),
+  })
+  const session = sessionQuery.data?.session
+  const messages = sessionQuery.data?.messages || []
+  const council = session?.council || []
+
+  const [collapsed, setCollapsed] = useState(false)
+  const [activeFilter, setActiveFilter] = useState('All')
+  const [showWhiteboard, setShowWhiteboard] = useState(true)
+  const [loggingOut, setLoggingOut] = useState(false)
+
+  const generateMutation = useMutation({
+    mutationFn: () => generateNextTurn(sessionId),
+    onSuccess: () =>
+      queryClient.invalidateQueries({
+        queryKey: ['debateSession', sessionId],
+      }),
+  })
+
+  const topic = session?.topic || session?.title || 'Your council discussion'
+  const mode = session?.mode?.replace('_', ' ') || 'manual'
+  const sessionNumber = sessionId ? sessionId.slice(-4).toUpperCase() : 'NEW'
+  const displayName = user?.name || user?.username || 'Your profile'
+  const visibleMessages = activeFilter === 'All'
+    ? messages
+    : messages.filter(message =>
+      message.speakerType === 'expert' && message.speakerRef === activeFilter
+    )
+  const canGenerateNextTurn = session?.mode === 'manual' &&
+    Boolean(session) &&
+    !['completed', 'abandoned'].includes(session?.status)
+
+  const formatTimestamp = timestamp => {
+    if (!timestamp) return ''
+    const date = new Date(timestamp)
+    return Number.isNaN(date.getTime())
+      ? ''
+      : date.toLocaleString(undefined, {
+        dateStyle: 'medium',
+        timeStyle: 'short',
+      })
+  }
+
+  const toggleTheme = () => {
+    const root = document.documentElement
+    const dark = !root.classList.contains('dark')
+    root.classList.toggle('dark', dark)
+    root.style.colorScheme = dark ? 'dark' : 'light'
+  }
+
+  const handleLogout = async () => {
+    try {
+      setLoggingOut(true)
+      await logoutUser()
+      navigate('/login', { replace: true })
+    } catch {
+      setLoggingOut(false)
+    }
+  }
 
   return (
-    <main className="min-h-screen bg-app px-6 py-12 text-text-primary">
-      <div className="mx-auto max-w-3xl">
-        <p className="text-sm font-medium text-brand">AI COUNCIL</p>
+    <div className="flex h-dvh min-h-[600px] overflow-hidden bg-app text-text-primary">
+      <WorkspaceSidebar
+        collapsed={collapsed}
+        userName={displayName}
+        loggingOut={loggingOut}
+        onNavigate={navigate}
+        onToggleTheme={toggleTheme}
+        onLogout={handleLogout}
+      />
 
-        <h1 className="mt-3 text-2xl font-bold">
-          {session?.topic || 'Debate session created'}
-        </h1>
+      <section className="flex min-w-0 flex-1 flex-col">
+        <WorkspaceHeader
+          collapsed={collapsed}
+          session={session}
+          sessionNumber={sessionNumber}
+          mode={mode}
+          councilCount={council.length}
+          onToggleSidebar={() => setCollapsed(value => !value)}
+        />
 
-        <p className="mt-3 text-sm text-text-secondary">
-          Your debate session has been created successfully.
-          The debate workspace and AI orchestration will be implemented next.
-        </p>
-
-        <div className="mt-6 rounded-xl border border-border bg-surface p-5">
-          <p className="text-sm text-text-secondary">Session ID</p>
-          <p className="mt-1 break-all font-mono text-sm">{sessionId}</p>
-
-          {session && (
-            <>
-              <p className="mt-4 text-sm text-text-secondary">Mode</p>
-              <p className="mt-1 capitalize">{session.mode.replace('_', ' ')}</p>
-
-              <p className="mt-4 text-sm text-text-secondary">Council members</p>
-              <p className="mt-1">{session.council.length}</p>
-            </>
-          )}
+        <div className="flex min-h-0 flex-1 gap-3 p-3 lg:gap-4 lg:p-4">
+          <DiscussionPanel
+            topic={topic}
+            council={council}
+            activeFilter={activeFilter}
+            onFilterChange={setActiveFilter}
+            canGenerateNextTurn={canGenerateNextTurn}
+            onGenerateNextTurn={() => generateMutation.mutate()}
+            isGenerating={generateMutation.isPending}
+            generationError={generateMutation.error}
+            sessionQuery={sessionQuery}
+            messages={messages}
+            visibleMessages={visibleMessages}
+            formatTimestamp={formatTimestamp}
+          />
+          <WhiteboardPanel
+            visible={showWhiteboard}
+            onHide={() => setShowWhiteboard(false)}
+            onShow={() => setShowWhiteboard(true)}
+          />
         </div>
-
-        <button
-          onClick={() => navigate('/dashboard')}
-          className="mt-6 rounded-xl bg-brand px-5 py-2.5 text-sm font-medium text-white"
-        >
-          Back to Dashboard
-        </button>
-      </div>
-    </main>
+      </section>
+    </div>
   )
 }

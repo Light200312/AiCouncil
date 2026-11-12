@@ -1,13 +1,9 @@
-
 import mongoose from 'mongoose'
 import Session from './session.model.js'
 import Expert from '../experts/expert.model.js'
 import Domain from '../domains/domain.model.js'
 import Message from './message.model.js'
 import { generateResponse } from '../../services/llm.service.js'
-
-
-
 
 export const createSession = async (req, res, next) => {
   try {
@@ -106,6 +102,7 @@ export const createSession = async (req, res, next) => {
     next(error)
   }
 }
+
 export const getSession = async (req, res, next) => {
   try {
     const { sessionId } = req.params
