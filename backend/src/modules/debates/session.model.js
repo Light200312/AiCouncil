@@ -24,6 +24,7 @@ const sessionSchema = new mongoose.Schema({
     ref: 'User',
     required: true,
   },
+  messageSequence: { type: Number, default: 0, min: 0 },
   title: { type: String, required: true, maxlength: 120 },
   topic: { type: String, required: true, maxlength: 500 },
   domains: [String],

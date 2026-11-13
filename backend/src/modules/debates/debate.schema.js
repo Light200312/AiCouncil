@@ -34,3 +34,13 @@ export const createSessionSchema = z.object({
   params: z.object({}),
   query: z.object({}),
 })
+
+export const createUserMessageSchema = z.object({
+  body: z.object({
+    content: z.string().trim().min(1).max(4000),
+  }),
+  params: z.object({
+    sessionId: objectId,
+  }),
+  query: z.object({}),
+})

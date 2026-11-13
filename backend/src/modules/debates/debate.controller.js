@@ -4,6 +4,79 @@ import Expert from '../experts/expert.model.js'
 import Domain from '../domains/domain.model.js'
 import Message from './message.model.js'
 import { generateResponse } from '../../services/llm.service.js'
+const allocateMessageSequence = async (sessionId, ownerId) => {
+  const latestMessage = await Message.findOne({ sessionId })
+    .sort({ sequence: -1 })
+    .select('sequence')
+    .lean()
+
+  await Session.updateOne(
+    { _id: sessionId, ownerId },
+    { $max: { messageSequence: latestMessage?.sequence ?? 0 } }
+  )
+
+  const updatedSession = await Session.findOneAndUpdate(
+    {
+      _id: sessionId,
+      ownerId,
+      status: { $nin: ['completed', 'abandoned'] },
+    },
+    { $inc: { messageSequence: 1 } },
+    { new: true }
+  ).select('messageSequence').lean()
+
+  return updatedSession?.messageSequence ?? null
+}
+export const addUserMessage = async (req, res, next) => {
+  try {
+    const { sessionId } = req.validated.params
+    const { content } = req.validated.body
+    const ownerId = req.user.userId
+
+    const session = await Session.findOne({
+      _id: sessionId,
+      ownerId,
+    }).select('status').lean()
+
+    if (!session) {
+      return res.status(404).json({
+        success: false,
+        message: 'Debate session not found.',
+      })
+    }
+
+    if (session.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        message: 'Start the debate before sending a message. Completed debates cannot accept messages.',
+      })
+    }
+
+    const sequence = await allocateMessageSequence(sessionId, ownerId)
+
+    if (!sequence) {
+      return res.status(409).json({
+        success: false,
+        message: 'This debate is no longer active.',
+      })
+    }
+
+    const message = await Message.create({
+      sessionId,
+      sequence,
+      speakerType: 'user',
+      speakerName: 'You',
+      content,
+    })
+
+    return res.status(201).json({
+      success: true,
+      data: { message },
+    })
+  } catch (error) {
+    return next(error)
+  }
+}
 
 export const createSession = async (req, res, next) => {
   try {
@@ -232,9 +305,20 @@ Respond as this expert. Address the topic directly, consider previous arguments,
 
     const content = await generateResponse(prompt, systemPrompt)
 
+
+
+    const sequence = await allocateMessageSequence(sessionId, req.user.userId)
+
+if (!sequence) {
+  return res.status(409).json({
+    success: false,
+    message: 'This debate is no longer active.',
+  })
+}
+
     const message = await Message.create({
       sessionId,
-      sequence: messages.length + 1,
+      sequence,
       speakerType: 'expert',
       speakerRef: expert.ref,
       speakerName: expert.name,

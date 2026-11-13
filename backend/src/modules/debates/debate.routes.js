@@ -1,12 +1,12 @@
 
 import { Router } from 'express'
 import { validate } from '../../middleware/validate.middleware.js'
-
+import { createUserMessageSchema } from './debate.schema.js'
 import { createSessionSchema } from './debate.schema.js'
 import {
   createSession,
   getSession,
-  generateNextTurn,
+  generateNextTurn,addUserMessage,
 } from './debate.controller.js'
 
 const router = Router()
@@ -25,7 +25,11 @@ router.get('/presets', (req, res) => {
     data: { presets },
   })
 })
-
+router.post(
+  '/:sessionId/messages',
+  validate(createUserMessageSchema),
+  addUserMessage
+)
 router.post('/', validate(createSessionSchema), createSession)
 router.get('/:sessionId', getSession)
 router.post('/:sessionId/next', generateNextTurn)
