@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { useNavigate, useParams } from "react-router-dom";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { useCurrentUser } from "../hooks/useCurrentUser";
@@ -14,6 +14,10 @@ import WorkspaceHeader from "../components/workspace/WorkspaceHeader";
 import WorkspaceSidebar from "../components/workspace/WorkspaceSidebar";
 
 export default function DebateWorkspace() {
+  const [autoRunning, setAutoRunning] = useState(false);
+  const [autoPauseRequested, setAutoPauseRequested] = useState(false);
+  const autoRunRef = useRef(false);
+
   const { sessionId } = useParams();
   const navigate = useNavigate();
   const queryClient = useQueryClient();
@@ -32,29 +36,30 @@ export default function DebateWorkspace() {
   const [showWhiteboard, setShowWhiteboard] = useState(true);
   const [loggingOut, setLoggingOut] = useState(false);
 
-const generateMutation = useMutation({
-  mutationFn: () => generateNextTurn(sessionId),
-  onSettled: () =>
-    queryClient.invalidateQueries({
-      queryKey: ['debateSession', sessionId],
-    }),
-})
+  const generateMutation = useMutation({
+    mutationFn: () => generateNextTurn(sessionId),
+    onSettled: () =>
+      queryClient.invalidateQueries({
+        queryKey: ["debateSession", sessionId],
+      }),
+  });
 
-const sendMutation = useMutation({
-  mutationFn: content => postUserMessage(sessionId, content),
+  const sendMutation = useMutation({
+    mutationFn: (content) => postUserMessage(sessionId, content),
 
-  onSuccess: async () => {
-    await queryClient.invalidateQueries({
-      queryKey: ['debateSession', sessionId],
-    })
+    onSuccess: async () => {
+      await queryClient.invalidateQueries({
+        queryKey: ["debateSession", sessionId],
+      });
 
-    generateMutation.mutate()
-  },
-})
+      generateMutation.mutate();
+    },
+  });
 
-
-  const canSendMessage =
-    session?.status === "active" && !generateMutation.isPending;
+const canSendMessage =
+  session?.status === 'active' &&
+  !generateMutation.isPending &&
+  !autoRunning
 
   const topic = session?.topic || session?.title || "Your council discussion";
   const mode = session?.mode?.replace("_", " ") || "manual";
@@ -102,6 +107,56 @@ const sendMutation = useMutation({
     }
   };
 
+  useEffect(() => {
+    return () => {
+      autoRunRef.current = false;
+    };
+  }, []);
+  const startAutoRun = async () => {
+    if (autoRunRef.current || session?.mode !== "auto") return;
+
+    const expertTurns = messages.filter(
+      (message) => message.speakerType === "expert",
+    ).length;
+    const turnLimit = session.argumentLimit ?? 10;
+    const turnsRemaining = Math.max(0, turnLimit - expertTurns);
+
+    if (turnsRemaining === 0) {
+      await sessionQuery.refetch();
+      return;
+    }
+
+    autoRunRef.current = true;
+    setAutoRunning(true);
+    setAutoPauseRequested(false);
+
+    try {
+      for (
+        let turn = 0;
+        turn < turnsRemaining && autoRunRef.current;
+        turn += 1
+      ) {
+        const result = await generateMutation.mutateAsync();
+
+        if (result?.completed) break;
+      }
+    } catch {
+      // The generation mutation exposes the error to the discussion panel.
+    } finally {
+      autoRunRef.current = false;
+      setAutoRunning(false);
+      setAutoPauseRequested(false);
+    }
+  };
+
+  const pauseAutoRun = () => {
+    autoRunRef.current = false;
+    setAutoPauseRequested(true);
+  };
+  const canRunAuto =
+  session?.mode === 'auto' &&
+  !['completed', 'abandoned'].includes(session?.status)
+  
   return (
     <div className="flex h-dvh min-h-[600px] overflow-hidden bg-app text-text-primary">
       <WorkspaceSidebar
@@ -117,6 +172,7 @@ const sendMutation = useMutation({
         <WorkspaceHeader
           collapsed={collapsed}
           session={session}
+          topic={topic}
           sessionNumber={sessionNumber}
           mode={mode}
           councilCount={council.length}
@@ -141,7 +197,14 @@ const sendMutation = useMutation({
             sessionStatus={session?.status}
             onSendMessage={(content, onSuccess) =>
               sendMutation.mutate(content, { onSuccess })
+              
             }
+            sessionMode={session?.mode || "manual"}
+            canRunAuto={canRunAuto}
+autoRunning={autoRunning}
+autoPauseRequested={autoPauseRequested}
+onStartAuto={startAutoRun}
+onPauseAuto={pauseAutoRun}
             isSending={sendMutation.isPending}
             sendError={sendMutation.error}
           />
