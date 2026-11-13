@@ -37,6 +37,8 @@ const sessionSchema = new mongoose.Schema({
     enum: ['manual', 'auto', 'semi_auto'],
     default: 'manual',
   },
+  turnLockToken: { type: String, default: null },
+turnLockAt: { type: Date, default: null },
   argumentLimit: { type: Number, default: null, min: 1, max: 100 },
   status: {
     type: String,

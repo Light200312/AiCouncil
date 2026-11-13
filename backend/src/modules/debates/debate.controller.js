@@ -3,6 +3,7 @@ import Session from './session.model.js'
 import Expert from '../experts/expert.model.js'
 import Domain from '../domains/domain.model.js'
 import Message from './message.model.js'
+import { randomUUID } from 'node:crypto'
 import { generateResponse } from '../../services/llm.service.js'
 const allocateMessageSequence = async (sessionId, ownerId) => {
   const latestMessage = await Message.findOne({ sessionId })
@@ -213,9 +214,11 @@ export const getSession = async (req, res, next) => {
 }
 
 export const generateNextTurn = async (req, res, next) => {
-  try {
-    const { sessionId } = req.params
+  const { sessionId } = req.params
+  const ownerId = req.user.userId
+  let lockToken
 
+  try {
     if (!mongoose.isValidObjectId(sessionId)) {
       return res.status(400).json({
         success: false,
@@ -223,22 +226,51 @@ export const generateNextTurn = async (req, res, next) => {
       })
     }
 
-    const session = await Session.findOne({
-      _id: sessionId,
-      ownerId: req.user.userId,
-    })
+    lockToken = randomUUID()
+    const now = new Date()
+    const staleLockTime = new Date(now.getTime() - 3 * 60 * 1000)
+
+    const session = await Session.findOneAndUpdate(
+      {
+        _id: sessionId,
+        ownerId,
+        status: { $nin: ['completed', 'abandoned'] },
+        $or: [
+          { turnLockAt: null },
+          { turnLockAt: { $lt: staleLockTime } },
+        ],
+      },
+      {
+        $set: {
+          turnLockToken: lockToken,
+          turnLockAt: now,
+        },
+      },
+      { new: true },
+    )
 
     if (!session) {
-      return res.status(404).json({
-        success: false,
-        message: 'Debate session not found.',
-      })
-    }
+      const existingSession = await Session.findOne({ _id: sessionId, ownerId })
+        .select('status')
+        .lean()
 
-    if (session.status === 'completed' || session.status === 'abandoned') {
-      return res.status(400).json({
+      if (!existingSession) {
+        return res.status(404).json({
+          success: false,
+          message: 'Debate session not found.',
+        })
+      }
+
+      if (['completed', 'abandoned'].includes(existingSession.status)) {
+        return res.status(400).json({
+          success: false,
+          message: 'This debate is no longer active.',
+        })
+      }
+
+      return res.status(409).json({
         success: false,
-        message: 'This debate is no longer active.',
+        message: 'A debate turn is already being generated.',
       })
     }
 
@@ -247,13 +279,10 @@ export const generateNextTurn = async (req, res, next) => {
       .lean()
 
     const expertTurns = messages.filter(
-      message => message.speakerType === 'expert'
+      message => message.speakerType === 'expert',
     ).length
 
-    if (
-      session.argumentLimit &&
-      expertTurns >= session.argumentLimit
-    ) {
+    if (session.argumentLimit && expertTurns >= session.argumentLimit) {
       session.status = 'completed'
       await session.save()
 
@@ -264,14 +293,10 @@ export const generateNextTurn = async (req, res, next) => {
       })
     }
 
-    // Select experts in council order.
-    const expert = session.council[
-      expertTurns % session.council.length
-    ]
-
-    const conversation = messages.map(message =>
-      `${message.speakerName}: ${message.content}`
-    ).join('\n\n')
+    const expert = session.council[expertTurns % session.council.length]
+    const conversation = messages
+      .map(message => `${message.speakerName}: ${message.content}`)
+      .join('\n\n')
 
     const prompt = `
 Debate topic: ${session.topic}
@@ -289,7 +314,6 @@ Respond as this expert. Address the topic directly, consider previous arguments,
 `
 
     const persona = expert.persona || {}
-
     const systemPrompt = [
       `You are ${expert.name}, ${expert.role}.`,
       expert.description,
@@ -304,17 +328,14 @@ Respond as this expert. Address the topic directly, consider previous arguments,
     ].filter(Boolean).join('\n')
 
     const content = await generateResponse(prompt, systemPrompt)
+    const sequence = await allocateMessageSequence(sessionId, ownerId)
 
-
-
-    const sequence = await allocateMessageSequence(sessionId, req.user.userId)
-
-if (!sequence) {
-  return res.status(409).json({
-    success: false,
-    message: 'This debate is no longer active.',
-  })
-}
+    if (!sequence) {
+      return res.status(409).json({
+        success: false,
+        message: 'This debate is no longer active.',
+      })
+    }
 
     const message = await Message.create({
       sessionId,
@@ -327,16 +348,13 @@ if (!sequence) {
 
     session.status = 'active'
 
-    if (
-      session.argumentLimit &&
-      expertTurns + 1 >= session.argumentLimit
-    ) {
+    if (session.argumentLimit && expertTurns + 1 >= session.argumentLimit) {
       session.status = 'completed'
     }
 
     await session.save()
 
-    res.json({
+    return res.json({
       success: true,
       data: {
         message,
@@ -344,6 +362,17 @@ if (!sequence) {
       },
     })
   } catch (error) {
-    next(error)
+    return next(error)
+  } finally {
+    if (lockToken) {
+      try {
+        await Session.updateOne(
+          { _id: sessionId, ownerId, turnLockToken: lockToken },
+          { $unset: { turnLockToken: 1, turnLockAt: 1 } },
+        )
+      } catch (error) {
+        console.error('Failed to release debate turn lock:', error)
+      }
+    }
   }
 }
