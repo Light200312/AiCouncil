@@ -6,7 +6,7 @@ export default function WorkspaceHeader({
   sessionNumber,
   mode,
   councilCount,
-  onToggleSidebar,
+  onToggleSidebar,topic
 }) {
   return (
     <header className="flex min-h-[68px] flex-wrap items-center justify-between gap-3 border-b border-border bg-surface px-4 py-1 lg:px-5">
@@ -16,7 +16,7 @@ export default function WorkspaceHeader({
         </button>
         <div className="min-w-0">
           <div className="flex flex-wrap items-center gap-2">
-            <h1 className="text-sm font-bold sm:text-base">Debate Session #{sessionNumber}</h1>
+            <h1 className="text-sm font-bold sm:text-base"> {topic}</h1>
             <span className={`inline-flex items-center gap-1 rounded-full border px-2 py-0.5 text-[10px] font-semibold tracking-wide ${
               session?.status === 'active'
                 ? 'border-emerald-200 bg-emerald-50 text-emerald-700 dark:border-emerald-900 dark:bg-emerald-950/60 dark:text-emerald-400'

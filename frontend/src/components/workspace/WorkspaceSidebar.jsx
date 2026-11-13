@@ -38,7 +38,7 @@ export default function WorkspaceSidebar({
   onLogout,
 }) {
   return (
-    <aside className={`z-20 flex shrink-0 flex-col border-r border-border bg-app transition-[width] duration-200 ${collapsed ? 'w-[68px]' : 'w-[240px]'}`}>
+    <aside className={`z-20 flex shrink-0 flex-col border-r border-border bg-app transition-[width]  duration-200 ${collapsed ? 'w-[68px]' : 'w-[240px]'}`}>
       <div className={`flex h-[68px] items-center border-b border-border ${collapsed ? 'justify-center px-2' : 'justify-between px-4'}`}>
         <button onClick={() => onNavigate('/dashboard')} className="flex min-w-0 items-center gap-3 text-left">
           <span className="grid h-8 w-8 shrink-0 place-items-center rounded-md bg-slate-900 text-xs font-bold text-white dark:bg-slate-100 dark:text-slate-900">AI</span>
