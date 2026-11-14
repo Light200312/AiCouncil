@@ -7,6 +7,7 @@ import {
   generateNextTurn,
   getDebateSession,
   postUserMessage,
+  updateDebateMode,
 } from "../services/debate";
 import DiscussionPanel from "../components/workspace/DiscussionPanel";
 import WhiteboardPanel from "../components/workspace/WhiteboardPanel";
@@ -56,10 +57,8 @@ export default function DebateWorkspace() {
     },
   });
 
-const canSendMessage =
-  session?.status === 'active' &&
-  !generateMutation.isPending &&
-  !autoRunning
+  const canSendMessage =
+    session?.status === "active" && !generateMutation.isPending && !autoRunning;
 
   const topic = session?.topic || session?.title || "Your council discussion";
   const mode = session?.mode?.replace("_", " ") || "manual";
@@ -138,7 +137,9 @@ const canSendMessage =
       ) {
         const result = await generateMutation.mutateAsync();
 
-        if (result?.completed) break;
+       if (result?.completed || result?.autoStopped || result?.mode === 'manual') {
+  break
+}
       }
     } catch {
       // The generation mutation exposes the error to the discussion panel.
@@ -154,9 +155,24 @@ const canSendMessage =
     setAutoPauseRequested(true);
   };
   const canRunAuto =
-  session?.mode === 'auto' &&
-  !['completed', 'abandoned'].includes(session?.status)
-  
+    session?.mode === "auto" &&
+    !["completed", "abandoned"].includes(session?.status);
+
+  const modeMutation = useMutation({
+    mutationFn: ({ mode, argumentLimit }) =>
+      updateDebateMode(sessionId, mode, argumentLimit),
+    onSuccess: (updatedSession) => {
+      queryClient.setQueryData(["debateSession", sessionId], (current) =>
+        current ? { ...current, session: updatedSession } : current,
+      );
+    },
+  });
+  const canChangeMode =
+  session?.status === 'active' &&
+  !generateMutation.isPending &&
+  !sendMutation.isPending &&
+  !autoRunning &&
+  !modeMutation.isPending
   return (
     <div className="flex h-dvh min-h-[600px] overflow-hidden bg-app text-text-primary">
       <WorkspaceSidebar
@@ -193,20 +209,30 @@ const canSendMessage =
             messages={messages}
             visibleMessages={visibleMessages}
             formatTimestamp={formatTimestamp}
-            canSendMessage={canSendMessage}
+            canSendMessage={canSendMessage && !modeMutation.isPending}
             sessionStatus={session?.status}
             onSendMessage={(content, onSuccess) =>
               sendMutation.mutate(content, { onSuccess })
-              
             }
             sessionMode={session?.mode || "manual"}
             canRunAuto={canRunAuto}
-autoRunning={autoRunning}
-autoPauseRequested={autoPauseRequested}
-onStartAuto={startAutoRun}
-onPauseAuto={pauseAutoRun}
+            autoRunning={autoRunning}
+            autoPauseRequested={autoPauseRequested}
+            onStartAuto={startAutoRun}
+            onPauseAuto={pauseAutoRun}
             isSending={sendMutation.isPending}
             sendError={sendMutation.error}
+          
+sessionArgumentLimit={session?.argumentLimit}
+expertTurnCount={messages.filter(
+  message => message.speakerType === 'expert',
+).length}
+canChangeMode={canChangeMode}
+isModeChangePending={modeMutation.isPending}
+modeChangeError={modeMutation.error}
+onChangeMode={(mode, argumentLimit, onSuccess) =>
+  modeMutation.mutate({ mode, argumentLimit }, { onSuccess })
+}
           />
           <WhiteboardPanel
             visible={showWhiteboard}

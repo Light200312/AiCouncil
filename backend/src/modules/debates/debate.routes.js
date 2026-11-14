@@ -1,12 +1,14 @@
 
 import { Router } from 'express'
 import { validate } from '../../middleware/validate.middleware.js'
-import { createUserMessageSchema } from './debate.schema.js'
-import { createSessionSchema } from './debate.schema.js'
+import { createUserMessageSchema,createSessionSchema,updateSessionModeSchema} from './debate.schema.js'
+
 import {
   createSession,
   getSession,
-  generateNextTurn,addUserMessage,
+  generateNextTurn,
+  addUserMessage,
+  updateSessionMode
 } from './debate.controller.js'
 
 const router = Router()
@@ -33,4 +35,9 @@ router.post(
 router.post('/', validate(createSessionSchema), createSession)
 router.get('/:sessionId', getSession)
 router.post('/:sessionId/next', generateNextTurn)
+router.patch(
+  '/:sessionId/mode',
+  validate(updateSessionModeSchema),
+  updateSessionMode,
+)
 export default router

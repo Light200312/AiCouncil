@@ -28,15 +28,23 @@ export default function DiscussionPanel({
   onStartAuto,
   onPauseAuto,
   sessionMode,
+  sessionArgumentLimit,
+expertTurnCount,
+canChangeMode,
+isModeChangePending,
+modeChangeError,
+onChangeMode,
 }) {
 const [draft, setDraft] = useState("");
   const [isMultiline, setIsMultiline] = useState(false);
   const [dismissedHint, setDismissedHint] = useState(null);
   const [showModeMenu, setShowModeMenu] = useState(false);
   const textareaRef = useRef(null);
-  const expertTurnCount = messages.filter(
-    (message) => message.speakerType === "expert",
-  ).length;
+  const [pendingMode, setPendingMode] = useState(null)
+const [modeLimitDraft, setModeLimitDraft] = useState(10)
+  // const expertTurnCount = messages.filter(
+  //   (message) => message.speakerType === "expert",
+  // ).length;
 
   const generatingExpert = council.length
     ? council[expertTurnCount % council.length]
@@ -240,7 +248,7 @@ useLayoutEffect(() => {
                 onClick={autoRunning ? onPauseAuto : onStartAuto}
                 disabled={isSending || (!autoRunning && isGenerating)}
                 title={autoRunning ? "Pause Auto Debate" : "Start Auto Debate"}
-                className={`flex h-10 w-10 items-center justify-center rounded-full shadow-md transition-all ${
+                className={`flex h-10 w-10 pr-1 items-center justify-center rounded-full shadow-md transition-all ${
                   autoRunning 
                     ? "bg-surface border border-border text-brand hover:bg-surface-hover" 
                     : "bg-brand text-white hover:bg-brand-hover"
@@ -341,16 +349,103 @@ useLayoutEffect(() => {
                     <div className="px-3 py-2 text-[11px] font-bold text-text-secondary uppercase tracking-wider">
                       Debate Mode
                     </div>
-                    {["manual", "auto", "semi_auto"].map((mode) => (
-                      <button
-                        key={mode}
-                        type="button"
-                        className="w-full text-left rounded-xl px-3 py-2 text-sm hover:bg-surface-hover capitalize"
-                        onClick={() => setShowModeMenu(false)}
-                      >
-                        {mode.replace("_", " ")}
-                      </button>
-                    ))}
+                   {['manual', 'auto', 'semi_auto'].map(mode => {
+  const isDeferred = mode === 'semi_auto'
+  const isSelected = sessionMode === mode
+
+  const selectMode = () => {
+    if (isDeferred || !canChangeMode || isModeChangePending) return
+
+    if (mode === 'auto' && sessionMode !== 'auto') {
+      setModeLimitDraft(
+        Math.max(sessionArgumentLimit || 10, expertTurnCount + 1),
+      )
+      setPendingMode('auto')
+      return
+    }
+
+    if (mode !== sessionMode) {
+      onChangeMode(mode, null, () => {
+        setPendingMode(null)
+        setShowModeMenu(false)
+      })
+      return
+    }
+
+    setShowModeMenu(false)
+  }
+
+  return (
+    <button
+      key={mode}
+      type="button"
+      disabled={isDeferred || !canChangeMode || isModeChangePending}
+      aria-pressed={isSelected}
+      onClick={selectMode}
+      className={`w-full rounded-xl px-3 py-2 text-left text-sm capitalize ${
+        isSelected
+          ? 'bg-brand/10 text-brand'
+          : 'hover:bg-surface-hover'
+      } disabled:cursor-not-allowed disabled:opacity-50`}
+    >
+      {mode.replace('_', ' ')}
+      {isDeferred && (
+        <span className="ml-2 text-[10px] text-text-secondary">
+          Coming soon
+        </span>
+      )}
+    </button>
+  )
+})}{pendingMode === 'auto' && (
+  <div className="mt-2 border-t border-border px-3 pt-3">
+    <label htmlFor="modeArgumentLimit" className="text-xs font-medium">
+      Expert response limit
+    </label>
+
+    <input
+      id="modeArgumentLimit"
+      type="number"
+      min={Math.max(1, expertTurnCount + 1)}
+      max={100}
+      value={modeLimitDraft}
+      onChange={event => setModeLimitDraft(Number(event.target.value))}
+      className="mt-2 w-full rounded-lg border border-border bg-app px-3 py-2 text-sm"
+    />
+
+    {modeChangeError && (
+      <p role="alert" className="mt-2 text-xs text-red-600 dark:text-red-400">
+        {modeChangeError.response?.data?.message ||
+          'Could not change the debate mode.'}
+      </p>
+    )}
+
+    <div className="mt-3 flex justify-end gap-2">
+      <button
+        type="button"
+        onClick={() => setPendingMode(null)}
+        className="rounded-lg px-3 py-2 text-xs text-text-secondary hover:bg-surface-hover"
+      >
+        Cancel
+      </button>
+
+      <button
+        type="button"
+        disabled={
+          isModeChangePending ||
+          modeLimitDraft <= expertTurnCount ||
+          modeLimitDraft > 100
+        }
+        onClick={() => onChangeMode('auto', modeLimitDraft, () => {
+          setPendingMode(null)
+          setShowModeMenu(false)
+        })}
+        className="rounded-lg bg-brand px-3 py-2 text-xs font-semibold text-white hover:bg-brand-hover disabled:opacity-50"
+      >
+        {isModeChangePending ? 'Saving...' : 'Switch to Auto'}
+      </button>
+    </div>
+  </div>
+)}
                   </div>
                 )}
               </div>

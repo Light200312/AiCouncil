@@ -128,6 +128,7 @@ export default function DebateSetup() {
               <button
                 key={item.id}
                 type="button"
+                disabled={item.id === 'semi_auto'}
                 onClick={() => setMode(item.id)}
                 className={`rounded-xl border p-4 text-left transition ${
                   mode === item.id

@@ -22,3 +22,11 @@ export const generateNextTurn = async (sessionId) => {
   const { data } = await api.post(`/debates/${sessionId}/next`)
   return data.data
 }
+export const updateDebateMode = async (sessionId, mode, argumentLimit) => {
+  const { data } = await api.patch(`/debates/${sessionId}/mode`, {
+    mode,
+    argumentLimit,
+  })
+
+  return data.data.session
+}

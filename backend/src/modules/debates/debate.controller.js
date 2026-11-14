@@ -176,7 +176,94 @@ export const createSession = async (req, res, next) => {
     next(error)
   }
 }
+export const updateSessionMode = async (req, res, next) => {
+  try {
+    const { sessionId } = req.validated.params
+    const { mode, argumentLimit } = req.validated.body
+    const ownerId = req.user.userId
 
+    const currentSession = await Session.findOne({ _id: sessionId, ownerId })
+      .select('status turnLockAt messageSequence')
+      .lean()
+
+    if (!currentSession) {
+      return res.status(404).json({
+        success: false,
+        message: 'Debate session not found.',
+      })
+    }
+
+    if (currentSession.status !== 'active') {
+      return res.status(400).json({
+        success: false,
+        message: 'Only active debates can change modes.',
+      })
+    }
+//fetch total expert turns already happened
+    const expertTurns = await Message.countDocuments({
+      sessionId,
+      speakerType: 'expert',
+    })
+//check if arg limit provided is already  reached
+    if (mode === 'auto' && argumentLimit <= expertTurns) {
+      return res.status(400).json({
+        success: false,
+        message: `The response limit must be greater than the ${expertTurns} expert responses already generated.`,
+      })
+    }
+
+    const staleLockTime = new Date(Date.now() - 3 * 60 * 1000)
+
+    const session = await Session.findOneAndUpdate(
+      {
+        _id: sessionId,
+        ownerId,
+        status: 'active',
+        $and: [
+          {
+            $or: [
+              { turnLockAt: null },
+              { turnLockAt: { $lt: staleLockTime } },
+            ],
+          },
+          {
+            $or: [
+              { messageSequence: currentSession.messageSequence ?? 0 },
+              { messageSequence: { $exists: false } },
+            ],
+          },
+        ],
+      },
+      {
+        $set: {
+          mode,
+          argumentLimit: mode === 'auto' ? argumentLimit : null,
+        },
+        $unset: {
+          turnLockToken: 1,
+          turnLockAt: 1,
+        },
+      },
+      { new: true, runValidators: true },
+    )
+      .select('-ownerId -turnLockToken -turnLockAt')
+      .lean()
+
+    if (!session) {
+      return res.status(409).json({
+        success: false,
+        message: 'A turn is generating or the debate changed. Wait for it to finish, then try again.',
+      })
+    }
+
+    return res.json({
+      success: true,
+      data: { session },
+    })
+  } catch (error) {
+    return next(error)
+  }
+}
 export const getSession = async (req, res, next) => {
   try {
     const { sessionId } = req.params
@@ -283,13 +370,18 @@ export const generateNextTurn = async (req, res, next) => {
     ).length
 
     if (session.argumentLimit && expertTurns >= session.argumentLimit) {
-      session.status = 'completed'
+      session.status = 'manual';
+       session.argumentLimit = null
       await session.save()
 
       return res.json({
-        success: true,
-        message: 'Argument limit reached.',
-        data: { completed: true },
+         success: true,
+    message: 'Auto limit reached. Debate switched to manual mode.',
+    data: {
+      completed: false,
+      mode: 'manual',
+      autoStopped: true,
+    },
       })
     }
 
@@ -346,21 +438,31 @@ Respond as this expert. Address the topic directly, consider previous arguments,
       content,
     })
 
-    session.status = 'active'
+   session.status = 'active'
 
-    if (session.argumentLimit && expertTurns + 1 >= session.argumentLimit) {
-      session.status = 'completed'
-    }
+let autoStopped = false
 
-    await session.save()
+if (
+  session.mode === 'auto' &&
+  session.argumentLimit &&
+  expertTurns + 1 >= session.argumentLimit
+) {
+  session.mode = 'manual'
+  session.argumentLimit = null
+  autoStopped = true
+}
 
-    return res.json({
-      success: true,
-      data: {
-        message,
-        completed: session.status === 'completed',
-      },
-    })
+await session.save()
+
+return res.json({
+  success: true,
+  data: {
+    message,
+    completed: false,
+    mode: session.mode,
+    autoStopped,
+  },
+})
   } catch (error) {
     return next(error)
   } finally {

@@ -28,13 +28,31 @@ export const createSessionSchema = z.object({
     topic: z.string().trim().min(1).max(500),
     domains: z.array(objectId).max(10).default([]),
     experts: z.array(selectedExpert).min(2).max(12),
-    mode: z.enum(['manual', 'auto', 'semi_auto']).default('manual'),
+    mode: z.enum(['manual', 'auto']).default('manual'),
     argumentLimit: z.number().int().min(1).max(100).nullable().optional(),
   }),
   params: z.object({}),
   query: z.object({}),
 })
 
+export const updateSessionModeSchema = z.object({
+  body: z.object({
+    mode: z.enum(['manual', 'auto']),
+    argumentLimit: z.number().int().min(1).max(100).nullable().optional(),
+  }),
+  params: z.object({
+    sessionId: objectId,
+  }),
+  query: z.object({}),
+}).superRefine(({ body }, ctx) => {
+  if (body.mode === 'auto' && body.argumentLimit == null) {
+    ctx.addIssue({
+      code: z.ZodIssueCode.custom,
+      path: ['body', 'argumentLimit'],
+      message: 'Auto mode requires an expert response limit.',
+    })
+  }
+})
 export const createUserMessageSchema = z.object({
   body: z.object({
     content: z.string().trim().min(1).max(4000),
