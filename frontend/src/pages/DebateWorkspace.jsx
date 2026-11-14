@@ -114,11 +114,8 @@ export default function DebateWorkspace() {
   const startAutoRun = async () => {
     if (autoRunRef.current || session?.mode !== "auto") return;
 
-    const expertTurns = messages.filter(
-      (message) => message.speakerType === "expert",
-    ).length;
-    const turnLimit = session.argumentLimit ?? 10;
-    const turnsRemaining = Math.max(0, turnLimit - expertTurns);
+    const turnsRemaining =
+      session.autoTurnsRemaining ?? session.argumentLimit ?? 10;
 
     if (turnsRemaining === 0) {
       await sessionQuery.refetch();
@@ -137,9 +134,13 @@ export default function DebateWorkspace() {
       ) {
         const result = await generateMutation.mutateAsync();
 
-       if (result?.completed || result?.autoStopped || result?.mode === 'manual') {
-  break
-}
+        if (
+          result?.completed ||
+          result?.autoStopped ||
+          result?.mode === "manual"
+        ) {
+          break;
+        }
       }
     } catch {
       // The generation mutation exposes the error to the discussion panel.
@@ -168,11 +169,11 @@ export default function DebateWorkspace() {
     },
   });
   const canChangeMode =
-  session?.status === 'active' &&
-  !generateMutation.isPending &&
-  !sendMutation.isPending &&
-  !autoRunning &&
-  !modeMutation.isPending
+    session?.status === "active" &&
+    !generateMutation.isPending &&
+    !sendMutation.isPending &&
+    !autoRunning &&
+    !modeMutation.isPending;
   return (
     <div className="flex h-dvh min-h-[600px] overflow-hidden bg-app text-text-primary">
       <WorkspaceSidebar
@@ -222,17 +223,14 @@ export default function DebateWorkspace() {
             onPauseAuto={pauseAutoRun}
             isSending={sendMutation.isPending}
             sendError={sendMutation.error}
-          
-sessionArgumentLimit={session?.argumentLimit}
-expertTurnCount={messages.filter(
-  message => message.speakerType === 'expert',
-).length}
-canChangeMode={canChangeMode}
-isModeChangePending={modeMutation.isPending}
-modeChangeError={modeMutation.error}
-onChangeMode={(mode, argumentLimit, onSuccess) =>
-  modeMutation.mutate({ mode, argumentLimit }, { onSuccess })
-}
+            sessionArgumentLimit={session?.argumentLimit}
+       
+            canChangeMode={canChangeMode}
+            isModeChangePending={modeMutation.isPending}
+            modeChangeError={modeMutation.error}
+            onChangeMode={(mode, argumentLimit, onSuccess) =>
+              modeMutation.mutate({ mode, argumentLimit }, { onSuccess })
+            }
           />
           <WhiteboardPanel
             visible={showWhiteboard}

@@ -164,7 +164,8 @@ export const createSession = async (req, res, next) => {
       domains: domainDocs.map(domain => domain.name),
       council,
       mode,
-      argumentLimit: mode === 'manual' ? null : (argumentLimit ?? 10),
+     argumentLimit: mode === 'manual' ? null : (argumentLimit ?? 10),
+autoTurnsRemaining: mode === 'auto' ? (argumentLimit ?? 10) : null,
     })
 
     res.status(201).json({
@@ -199,18 +200,18 @@ export const updateSessionMode = async (req, res, next) => {
         message: 'Only active debates can change modes.',
       })
     }
-//fetch total expert turns already happened
-    const expertTurns = await Message.countDocuments({
-      sessionId,
-      speakerType: 'expert',
-    })
-//check if arg limit provided is already  reached
-    if (mode === 'auto' && argumentLimit <= expertTurns) {
-      return res.status(400).json({
-        success: false,
-        message: `The response limit must be greater than the ${expertTurns} expert responses already generated.`,
-      })
-    }
+// //fetch total expert turns already happened
+//     const expertTurns = await Message.countDocuments({
+//       sessionId,
+//       speakerType: 'expert',
+//     })
+// //check if arg limit provided is already  reached
+//     if (mode === 'auto' && argumentLimit <= expertTurns) {
+//       return res.status(400).json({
+//         success: false,
+//         message: `The response limit must be greater than the ${expertTurns} expert responses already generated.`,
+//       })
+//     }
 
     const staleLockTime = new Date(Date.now() - 3 * 60 * 1000)
 
@@ -235,10 +236,11 @@ export const updateSessionMode = async (req, res, next) => {
         ],
       },
       {
-        $set: {
-          mode,
-          argumentLimit: mode === 'auto' ? argumentLimit : null,
-        },
+       $set: {
+  mode,
+  argumentLimit: mode === 'auto' ? argumentLimit : null,
+  autoTurnsRemaining: mode === 'auto' ? argumentLimit : null,
+},
         $unset: {
           turnLockToken: 1,
           turnLockAt: 1,
@@ -360,7 +362,27 @@ export const generateNextTurn = async (req, res, next) => {
         message: 'A debate turn is already being generated.',
       })
     }
+    if (session.mode === 'auto' && session.autoTurnsRemaining == null) {
+  session.autoTurnsRemaining = session.argumentLimit ?? 10
+}
 
+if (session.mode === 'auto' && session.autoTurnsRemaining <= 0) {
+  session.mode = 'manual'
+  session.argumentLimit = null
+  session.autoTurnsRemaining = null
+  session.status = 'active'
+  await session.save()
+
+  return res.json({
+    success: true,
+    message: 'Auto run finished. Debate switched to manual mode.',
+    data: {
+      completed: false,
+      mode: 'manual',
+      autoStopped: true,
+    },
+  })
+}
     const messages = await Message.find({ sessionId })
       .sort({ sequence: 1 })
       .lean()
@@ -369,21 +391,21 @@ export const generateNextTurn = async (req, res, next) => {
       message => message.speakerType === 'expert',
     ).length
 
-    if (session.argumentLimit && expertTurns >= session.argumentLimit) {
-      session.status = 'manual';
-       session.argumentLimit = null
-      await session.save()
+    // if (session.argumentLimit && expertTurns >= session.argumentLimit) {
+    //   session.status = 'active';
+    //    session.argumentLimit = null
+    //   await session.save()
 
-      return res.json({
-         success: true,
-    message: 'Auto limit reached. Debate switched to manual mode.',
-    data: {
-      completed: false,
-      mode: 'manual',
-      autoStopped: true,
-    },
-      })
-    }
+    //   return res.json({
+    //      success: true,
+    // message: 'Auto limit reached. Debate switched to manual mode.',
+    // data: {
+    //   completed: false,
+    //   mode: 'manual',
+    //   autoStopped: true,
+    // },
+    //   })
+    // }
 
     const expert = session.council[expertTurns % session.council.length]
     const conversation = messages
@@ -438,18 +460,22 @@ Respond as this expert. Address the topic directly, consider previous arguments,
       content,
     })
 
-   session.status = 'active'
+session.status = 'active'
 
 let autoStopped = false
 
-if (
-  session.mode === 'auto' &&
-  session.argumentLimit &&
-  expertTurns + 1 >= session.argumentLimit
-) {
-  session.mode = 'manual'
-  session.argumentLimit = null
-  autoStopped = true
+if (session.mode === 'auto') {
+  session.autoTurnsRemaining = Math.max(
+    0,
+    session.autoTurnsRemaining - 1,
+  )
+
+  if (session.autoTurnsRemaining === 0) {
+    session.mode = 'manual'
+    session.argumentLimit = null
+    session.autoTurnsRemaining = null
+    autoStopped = true
+  }
 }
 
 await session.save()

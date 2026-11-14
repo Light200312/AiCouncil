@@ -31,7 +31,7 @@ const sessionSchema = new mongoose.Schema({
   council: {
     type: [councilMemberSchema],
     validate: value => value.length >= 2 && value.length <= 12,
-  },
+  },autoTurnsRemaining: { type: Number, default: null, min: 0 },
   mode: {
     type: String,
     enum: ['manual', 'auto', 'semi_auto'],

@@ -15,11 +15,6 @@ const modes = [
     title: 'Auto',
     description: 'Experts debate automatically until the argument limit.',
   },
-  {
-    id: 'semi_auto',
-    title: 'Semi-auto',
-    description: 'Runs automatically but pauses when an expert needs your input.',
-  },
 ]
 
 export default function DebateSetup() {
@@ -128,7 +123,6 @@ export default function DebateSetup() {
               <button
                 key={item.id}
                 type="button"
-                disabled={item.id === 'semi_auto'}
                 onClick={() => setMode(item.id)}
                 className={`rounded-xl border p-4 text-left transition ${
                   mode === item.id
@@ -235,7 +229,7 @@ export default function DebateSetup() {
           <p className="truncate text-sm font-semibold">
             {mode === 'manual'
               ? 'Manual debate'
-              : `${mode === 'auto' ? 'Auto' : 'Semi-auto'} · ${argumentLimit} responses`}
+              : `Auto · ${argumentLimit} responses`}
           </p>
 
           <p className="text-xs text-text-secondary">

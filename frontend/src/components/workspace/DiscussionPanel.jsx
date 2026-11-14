@@ -248,7 +248,7 @@ useLayoutEffect(() => {
                 onClick={autoRunning ? onPauseAuto : onStartAuto}
                 disabled={isSending || (!autoRunning && isGenerating)}
                 title={autoRunning ? "Pause Auto Debate" : "Start Auto Debate"}
-                className={`flex h-10 w-10 pr-1 items-center justify-center rounded-full shadow-md transition-all ${
+                className={`flex h-13 w-13  pr-1 items-center justify-center rounded-full shadow-md transition-all ${
                   autoRunning 
                     ? "bg-surface border border-border text-brand hover:bg-surface-hover" 
                     : "bg-brand text-white hover:bg-brand-hover"
@@ -349,12 +349,11 @@ useLayoutEffect(() => {
                     <div className="px-3 py-2 text-[11px] font-bold text-text-secondary uppercase tracking-wider">
                       Debate Mode
                     </div>
-                   {['manual', 'auto', 'semi_auto'].map(mode => {
-  const isDeferred = mode === 'semi_auto'
+                   {['manual', 'auto'].map(mode => {
   const isSelected = sessionMode === mode
 
   const selectMode = () => {
-    if (isDeferred || !canChangeMode || isModeChangePending) return
+    if (!canChangeMode || isModeChangePending) return
 
     if (mode === 'auto' && sessionMode !== 'auto') {
       setModeLimitDraft(
@@ -379,7 +378,7 @@ useLayoutEffect(() => {
     <button
       key={mode}
       type="button"
-      disabled={isDeferred || !canChangeMode || isModeChangePending}
+      disabled={!canChangeMode || isModeChangePending}
       aria-pressed={isSelected}
       onClick={selectMode}
       className={`w-full rounded-xl px-3 py-2 text-left text-sm capitalize ${
@@ -389,11 +388,6 @@ useLayoutEffect(() => {
       } disabled:cursor-not-allowed disabled:opacity-50`}
     >
       {mode.replace('_', ' ')}
-      {isDeferred && (
-        <span className="ml-2 text-[10px] text-text-secondary">
-          Coming soon
-        </span>
-      )}
     </button>
   )
 })}{pendingMode === 'auto' && (
